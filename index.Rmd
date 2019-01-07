@@ -1,0 +1,65 @@
+---
+title: "Chicago Crime Shiny App Presentation"
+author: "Carson"
+date: "January 6, 2019"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(dplyr); library(data.table); library(plotly); library(lubridate)
+```
+
+## Overview
+This presentation will cover the creation, and functionality of the Chicago Crime ShinyApp. The purpose of this app is to allow users to see how certain types of crimes trend during different times of the year. 
+
+Following the selection of new input values, users will expect to see their updated output almost instantaneously. In order to avoid long wait times the code has been separated into three files; global.R, server.R, and ui.R. 
+
+In this exercise we will be using data that can be obtained from the cityofchicago.org. The link to downloading the data can be found below.
+- "https://data.cityofchicago.org/api/views/vwwp-7yr9/rows.csv?accessType=DOWNLOAD&bom=true&format=true"
+
+## ui.R Code
+The ui.R file contains all of the reactive inputs users would be interested for this assessment. The Date Range can be adjusted to allow users to focus on only relevant time frames. Users can also indicate which type of crime they would like to analyze by selecting it from the drop down menu. 
+```{r, eval=FALSE, echo=TRUE}
+fluidPage(
+  wellPanel(
+    sliderInput("slider1","Date Range", 
+              min = as.Date("2015-01-01", "%Y-%m-%d"),
+              max = as.Date("2015-12-31", "%Y-%m-%d"),
+              value = c(as.Date("2015-01-01", "%Y-%m-%d"), 
+                        as.Date("2015-12-31", "%Y-%m-%d")),
+              timeFormat = "%Y-%m-%d"),
+  selectInput("ycol","Y Input",
+              choices=as.character(unique(
+                unlist(crimeDf[["Primary.Type"]])))),
+  #...formatting code excluded in order to condense script
+  plotOutput("crime_plot"))
+```
+
+## server.R Code
+The inputs selected by the user will then edit both the Date and Primary (crime) Type inputs within the Chicago data set. Notice how the data not only had to be filtered based on the user's inputs, but the data also had to be summarized to show the number of selected crimes that occurred within each week. 
+```{r, eval=FALSE, echo=TRUE}
+function(input, output){
+  output$crime_plot <- renderPlot({
+    df <- crimeDf %>%
+      select(Date, Primary.Type) %>%
+      filter(Date >= input$slider1[1] & 
+               Date <= input$slider1[2] & 
+               Primary.Type == input$ycol) %>%
+      group_by(as.Date(cut(Date, breaks = "weeks"), "%Y-%m-%d")) %>%
+      summarize(event_count = n())
+    names(df) <- c("event_date","event_count")
+    ggplot(df, aes(x = event_date, y = event_count)) + 
+      geom_bar(stat="identity")
+  })}
+```
+
+## global.R code
+The purpose of the global.R file is to load the large Chicago data frame. Since this is only loaded at the time of initially hosting the ShinyApp to shinyapps.io, users will not have to wait for this data set to be downloaded from the web each time they open, or edit the app. 
+```{r, eval=FALSE, echo=TRUE}
+library(data.table); library(lubridate)
+crimeDf <- read.csv(url("https://data.cityofchicago.org/api/
+                        views/vwwp-7yr9/rows.csv?accessType=
+                        DOWNLOAD&bom=true&format=true"))
+crimeDf$Date <- as.Date(crimeDf$Date, '%m/%d/%Y %H:%M:%S')
+```
